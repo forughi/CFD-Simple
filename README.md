@@ -5,6 +5,6 @@ CFD Final Volume Code for 2D square geometry, arbitrary boundary conditions, and
 The results can be opened directly usuing Tecplot or any text editor!
 
 FVM Method: Staggered Grid
-Algorithm: SIMPLE 
+Algorithm: SIMPLE
 Difference scheme: Hybrid
 Solver: BiCGSTAB (Sparse)
