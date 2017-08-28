@@ -324,7 +324,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 			ae=max(-fe,(de-fe/2.0),0.0d0)!
 			as=max(+fs,(ds+fs/2.0),0.0d0)!
 			aw=max(+fw,(dw+fw/2.0),0.0d0)!
-			n=max(-fn,(dn-fn/2.0),0.0d0)!
+			an=max(-fn,(dn-fn/2.0),0.0d0)!
 			ap=ae+as+aw+an+(fe-fw+fn-fs)
 
 
@@ -371,7 +371,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 			k=k+1
 			vmatv(k)=ap/alphav!-sp
 			vmati(k)=(j-3)*(ni)+(i-1)
-			matj(k)=(j-3)*(ni)+(i-1)
+			vmatj(k)=(j-3)*(ni)+(i-1)
 
 			apv(i,j)=ap
 
