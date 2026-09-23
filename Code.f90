@@ -8,7 +8,6 @@
 !***     Solver: BiCGSTAB (Sparse)      ***
 !******************************************
 
-
 implicit none
 allocatable ps(:,:),pp(:,:),us(:,:),vs(:,:),apu(:,:),apv(:,:)
 allocatable umatv(:),umati(:),umatj(:),umrhs(:),x(:),vmatv(:),vmati(:),vmatj(:),vmrhs(:)
@@ -185,29 +184,29 @@ do
 			read*,mi
 			print*,"Enter X max:"
 			read*,ma
-			pbcn(int(mi/dx)+1:int(ma/dx)+1)=1
-			ps(int(mi/dx)+1:int(ma/dx)+1,nj+1)=val
+			pbcn(int(mi/dx)+2:int(ma/dx)+1)=1
+			ps(int(mi/dx)+2:int(ma/dx)+1,nj+1)=val
 		elseif (side=="s") then
 			print*,"Enter X min:"
 			read*,mi
 			print*,"Enter X max:"
 			read*,ma
-			pbcs(int(mi/dx)+1:int(ma/dx)+1)=1
-			ps(int(mi/dx)+1:int(ma/dx)+1,2)=val
+			pbcs(int(mi/dx)+2:int(ma/dx)+1)=1
+			ps(int(mi/dx)+2:int(ma/dx)+1,2)=val
 		elseif (side=="e") then
 			print*,"Enter Y min:"
 			read*,mi
 			print*,"Enter Y max:"
 			read*,ma
-			pbce(int(mi/dy)+1:int(ma/dy)+1)=1
-			ps(ni+1,int(mi/dy)+1:int(ma/dy)+1)=val
+			pbce(int(mi/dy)+2:int(ma/dy)+1)=1
+			ps(ni+1,int(mi/dy)+2:int(ma/dy)+1)=val
 		elseif (side=="w") then
 			print*,"Enter Y min:"
 			read*,mi
 			print*,"Enter Y max:"
 			read*,ma
-			pbcw(int(mi/dy)+1:int(ma/dy)+1)=1
-			ps(2,int(mi/dy)+1:int(ma/dy)+1)=val
+			pbcw(int(mi/dy)+2:int(ma/dy)+1)=1
+			ps(2,int(mi/dy)+2:int(ma/dy)+1)=val
 		else
 			exit
 		endif
@@ -217,7 +216,7 @@ do
 enddo
 print*,"-----------------------------------------------------------"
 
-!Active Peressure BC:
+!Active Pressure BC:
 !pbcn(:)=0 ;pbcs(:)=0 ;pbce(:)=0 ;pbcw(:)=0 ! 1=Active  , 0=Deactive
 !Set Value of Pressure BC
 !ps(2,:)=+0.0d0    !W
@@ -226,10 +225,10 @@ print*,"-----------------------------------------------------------"
 !ps(:,nj+1)=+0.0d0 !N
 
 print*," "
-print*,"Enter Convergance Conditions:"
-print*,"Enter No. of Maximum iteration="
+print*,"Enter Convergence Conditions:"
+print*,"Enter No. of Maximum iterations="
 read*,simpit
-print*,"Enter minimum Continuity Residual threshold="
+print*,"Enter minimum continuity residual threshold ="
 read*,creslimit
 
 
@@ -283,8 +282,8 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				umati(k)=(j-2+1)*(ni-1)+(i-2)
 				umatj(k)=(j-2)*(ni-1)+(i-2)
 			else
-				ap=ap+mu*dx/(0.5*dy) !moving wall !*((us(i,j)-uw)/us(i,j))
-				bound=mu*(uwn(i))*dx/(0.5*dy)
+				ap=ap-an+mu*dx/(0.5*dy) !moving wall !*((us(i,j)-uw)/us(i,j))
+				bound=bound+mu*(uwn(i))*dx/(0.5*dy)
 			endif
 
 			if (j/=2) then !S
@@ -293,8 +292,8 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				umati(k)=(j-2-1)*(ni-1)+(i-2)
 				umatj(k)=(j-2)*(ni-1)+(i-2)
 			else
-				ap=ap+mu*dx/(0.5*dy) !static wall
-				bound=mu*(uws(i))*dx/(0.5*dy)
+				ap=ap-as+mu*dx/(0.5*dy) !static wall
+				bound=bound+mu*(uws(i))*dx/(0.5*dy)
 			endif
 
 			k=k+1
@@ -336,8 +335,8 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				vmati(k)=(j-3)*(ni)+(i-1-1)
 				vmatj(k)=(j-3)*(ni)+(i-1)
 			else
-				ap=ap+mu*dy/(0.5*dx) !stat wall
-				bound=mu*(uww(j))*dy/(0.5*dx)
+				ap=ap-aw+mu*dy/(0.5*dx) !stat wall
+				bound=bound+mu*(uww(j))*dy/(0.5*dx)
 			endif
 
 			if (i/=ni+1) then !E
@@ -346,8 +345,8 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				vmati(k)=(j-3)*(ni)+(i-1+1)
 				vmatj(k)=(j-3)*(ni)+(i-1)
 			else
-				ap=ap+mu*dy/(0.5*dx) !stat wall
-				bound=mu*(uwe(j))*dy/(0.5*dx)
+				ap=ap-ae+mu*dy/(0.5*dx) !stat wall
+				bound=bound+mu*(uwe(j))*dy/(0.5*dx)
 				endif
 
 			if (j/=nj+1) then !N
@@ -444,7 +443,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				cycle
 			endif
 
-			if ((j==2).and.(pbcs(j)==1)) then !P BC on S
+			if ((j==2).and.(pbcs(i)==1)) then !P BC on S
 				k=k+1
 				ap=0.01d0
 				pmatv(k)=ap
@@ -454,7 +453,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 				cycle
 			endif
 
-			if ((j==nj+1).and.(pbcn(j)==1)) then !P BC on N
+			if ((j==nj+1).and.(pbcn(i)==1)) then !P BC on N
 				k=k+1
 				ap=0.01d0
 				pmatv(k)=ap
@@ -543,7 +542,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 	enddo
 
 
-	if (contres<creslimit) exit !Convergance Checker (by the Continuity Residual)
+	if (contres<creslimit) exit !Convergence Checker (by the Continuity Residual)
 enddo !!SIMPLE Loop
 
 
@@ -669,7 +668,7 @@ subroutine bicgstab(a,ai,aj,nnzero,b,n,x,bires,bimaxit)
 		res=dsqrt(dot_product(r,r))/n
 
 
-		if ((res<bires).or.(i>bimaxit)) then !Convergance or Max iterations Checking
+		if ((res<bires).or.(i>bimaxit)) then !Convergence or Max iterations Checking
 			print*,"BiCGSTAB Res.=",res ,"by",i,"iters"
 			exit
 		endif
