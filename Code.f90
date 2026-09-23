@@ -12,10 +12,11 @@ implicit none
 allocatable ps(:,:),pp(:,:),us(:,:),vs(:,:),apu(:,:),apv(:,:)
 allocatable umatv(:),umati(:),umatj(:),umrhs(:),x(:),vmatv(:),vmati(:),vmatj(:),vmrhs(:)
 allocatable pmatv(:),pmati(:),pmatj(:),pmrhs(:),pxx(:),pyy(:)
+allocatable xu(:),xv(:)
 allocatable uwn(:),uws(:),uww(:),uwe(:),pbcn(:),pbcs(:),pbcw(:),pbce(:)
 real(8) lx,ly,dx,dy,ps,pp,us,vs,rho,mu,alphau,alphav,alphap,umatv,umrhs,x,bires,vmatv,vmrhs,pmatv,pmrhs,b
 real(8) fe,fw,fn,fs,de,dw,ds,dn,ae,aw,an,as,ap,bound,apu,apv
-real(8) uwn,uws,uww,uwe,spw
+real(8) uwn,uws,uww,uwe,spw,xu,xv
 real(8) idx,jdy,val,mi,ma,contres,creslimit
 integer i,j,ti,ni,nj,umati,umatj,unnzero,vmati,vmatj,vnnzero,pmati,pmatj,pnnzero,un,vn,pn,k,bimaxit,pxx,pyy,simpit
 integer pbcn,pbcs,pbcw,pbce
@@ -58,6 +59,8 @@ un=(ni-1)*(nj) ; vn=(ni)*(nj-1) ;pn=ni*nj !n*n
 allocate (umatv(1:unnzero),umati(1:unnzero),umatj(1:unnzero),umrhs(1:un),x(1:pn))
 allocate (vmatv(1:vnnzero),vmati(1:vnnzero),vmatj(1:vnnzero),vmrhs(1:vn),apu(3:ni+1,2:nj+1),apv(2:ni+1,3:nj+1))
 allocate (pmatv(1:pnnzero),pmati(1:pnnzero),pmatj(1:pnnzero),pmrhs(1:pn),pxx(1:pn),pyy(1:pn))
+allocate (xu(1:un),xv(1:vn))
+xu=0.0d0 ; xv=0.0d0
 allocate (uwn(1:ni+3),uws(1:ni+3),uww(1:nj+3),uwe(1:nj+3),pbcn(2:ni+1),pbcs(2:ni+1),pbcw(2:nj+1),pbce(2:nj+1))
 apu=0.0d0 ; apv=0.0d0 ; pmrhs=0.0d0
 uwn=0.0d0 ;uws=0.0d0 ;uww=0.0d0 ;uwe=0.0d0
@@ -383,15 +386,15 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 	!Solve U & V, then set results in U* & V*:
 2	format(a3,$)
 	write(*,2) "U "
-	call bicgstab(umatv,umati,umatj,unnzero,umrhs,un,x,bires,bimaxit)
+	call bicgstab(umatv,umati,umatj,unnzero,umrhs,un,xu,bires,bimaxit)
 	do k=1,un
-		us(mod(k-1,ni-1)+1+2,int((k-1)/(ni-1))+2)=x(k)
+		us(mod(k-1,ni-1)+1+2,int((k-1)/(ni-1))+2)=xu(k)
 	enddo
 
 	write(*,2) "V "
-	call bicgstab(vmatv,vmati,vmatj,vnnzero,vmrhs,vn,x,bires,bimaxit)
+	call bicgstab(vmatv,vmati,vmatj,vnnzero,vmrhs,vn,xv,bires,bimaxit)
 	do k=1,vn
-		vs(mod(k-1,ni)+1+1,int((k-1)/(ni))+3)=x(k)
+		vs(mod(k-1,ni)+1+1,int((k-1)/(ni))+3)=xv(k)
 	enddo
 
 	!Boundary Velocity Correction for Peressure BCs:
@@ -506,6 +509,7 @@ do ti=1,simpit !SIMPLE Algorithm Loop
 
 	!Solve Pressure Eqns.:
 	write(*,2) "P "
+	x=0.0d0 !pp tends to zero at convergence, so it keeps its zero start
 	call bicgstab(pmatv,pmati,pmatj,k,pmrhs,pn,x,bires,bimaxit) !pnnzero->k (for press BCs) !! DON'T change k
 	do k=1,pn
 		pp(mod(k-1,ni)+1+1,int((k-1)/(ni))+1+1)=x(k)
@@ -616,18 +620,24 @@ subroutine bicgstab(a,ai,aj,nnzero,b,n,x,bires,bimaxit)
 	REAL*8,  INTENT(inout), DIMENSION(1:n) :: b !Right hand side
 	REAL*8,  INTENT(inout), DIMENSION(1:n) :: x !Answer
 
-	allocatable temp(:),r0(:),r(:),p(:),s(:),rr(:)
+	allocatable temp(:),r0(:),r(:),p(:),s(:),rr(:),v(:)
 	integer i
-	real(8) temp,r0,r,p,alpha,s,w,rr,beta,res
-	allocate (temp(1:n),r0(1:n),r(1:n),p(1:n),s(1:n),rr(1:n))
+	real(8) temp,r0,r,p,alpha,s,w,rr,beta,res,v
+	allocate (temp(1:n),r0(1:n),r(1:n),p(1:n),s(1:n),rr(1:n),v(1:n))
 	i=0
 
 	!BiCGSTAB Algorithm:
 	!1:
-	x=0.0 !First Guess
+	!x enters with the previous solution as the first guess
 
 	call matvec(a,ai,aj,nnzero,x,n,temp)
 	r0=b-temp
+
+	res=dsqrt(dot_product(r0,r0))/n
+	if (res<bires) then !the guess already solves this system
+		print*,"BiCGSTAB Res.=",res ,"by",0,"iters"
+		return
+	endif
 
 	!2:
 	p=r0
@@ -638,11 +648,11 @@ subroutine bicgstab(a,ai,aj,nnzero,b,n,x,bires,bimaxit)
 		i=i+1
 
 		!4:
-		call matvec(a,ai,aj,nnzero,p,n,temp)
-		alpha=(dot_product(r,r0))/(dot_product(temp,r0))
+		call matvec(a,ai,aj,nnzero,p,n,v)
+		alpha=(dot_product(r,r0))/(dot_product(v,r0))
 
 		!5:
-		s=r-alpha*temp
+		s=r-alpha*v
 
 		!6:
 		call matvec(a,ai,aj,nnzero,s,n,temp)
@@ -657,9 +667,8 @@ subroutine bicgstab(a,ai,aj,nnzero,b,n,x,bires,bimaxit)
 		!9:
 		beta=((dot_product(rr,r0))/(dot_product(r,r0)))*(alpha/w)
 	
-		!10:
-		call matvec(a,ai,aj,nnzero,p,n,temp)
-		p=rr+beta*(p-w*temp)
+		!10: A.p is already in v from step 4
+		p=rr+beta*(p-w*v)
 
 		!11:
 		r=rr
